@@ -1,0 +1,13 @@
+[package]
+name = "paste-cleaner"
+version = "0.1.0"
+edition = "2021"
+description = "Turn text copied from a Claude terminal response into clean prose for messages/email."
+
+[lib]
+name = "paste_cleaner"
+path = "src/lib.rs"
+
+[[bin]]
+name = "paste-cleaner"
+path = "src/main.rs"
