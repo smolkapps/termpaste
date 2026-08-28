@@ -17,3 +17,19 @@ Each case below breaks at least one naive baseline. These map 1:1 to `tests/case
 | 8 | `emphasis_spanning_wrap` | `This is **very\n  important** text` | `This is very important text` | strip-before-reflow leaves unmatched `**`; ordering matters |
 | 9 | `idempotent_on_clean_prose` | already-clean prose | identical output | naive "always strip 2 chars" eats real leading characters on a second pass |
 | 10 | `preamble_and_emoji` | `Here's a longer version:\n\n---\n\nHey Mom ... 💙` | preamble + `---` gone, message + emoji kept verbatim | naive keeps AI framing and `---`; or an over-eager stripper eats the emoji / real text |
+
+## Round 2 — 10 more edge cases (found from a real Type-B `/copy` paste)
+
+| # | Name | Input (abridged) | Expected | Why it's an edge |
+|---|------|------------------|----------|------------------|
+| 11 | `inline_code_emphasis_preserved` | `` The `**markers**` stay `` | `` The `**markers**` stay `` | **BUG:** v1 stripped `**` inside inline code. Code spans must be verbatim. |
+| 12 | `underscore_identifiers_preserved` | `Call __init__ and my_var` | `Call __init__ and my_var` | **BUG:** underscore emphasis regex ate `__init__`. Code identifiers must survive. |
+| 13 | `wrapped_numbered_list` | `1. First item that\nwraps\n2. Second` | items stay separate; wrap joins into item 1 | list-boundary vs wrap-continuation |
+| 14 | `multiple_blank_lines_collapse` | `A\n\n\n\nB` | `A\n\nB` | over-blank input must collapse to one paragraph gap |
+| 15 | `leading_trailing_blank_and_space_trim` | `\n\n  Hello world  \n` | `Hello world` | surrounding blank lines + stray spaces trimmed |
+| 16 | `setext_heading_underline_dropped` | `Project Title\n=============` | `Project Title` | **BUG:** `===` underline joined into the title as text |
+| 17 | `crlf_line_endings` | `line that\r\nwrapped\r\n\r\nnext` | `line that wrapped\n\nnext` | Windows CRLF must reflow like LF |
+| 18 | `asterisk_bullets_kept` | `* one\n* two` | `* one\n* two` | `*` bullets must not be mistaken for italic markers |
+| 19 | `code_fence_with_markdown_inside` | fence containing `# h`, `- i`, `**b**`, `2 * 3` | verbatim | de-chrome must not reach inside fences |
+| 20 | `empty_and_whitespace_input` | `   \n\n\t\n` | `` (empty) | degenerate input → empty, no panic |
+| 21 | `nested_blockquote_collapsed` | `> > a\n> > b` | `> a b` | nested quote levels collapse to one, wrap joins |

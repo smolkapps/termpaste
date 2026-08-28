@@ -74,3 +74,81 @@ fn case10_preamble_and_emoji() {
     let expected = "Hey Mom, I hope you have an absolutely amazing weekend!\n\nLove you! 💙";
     assert_eq!(clean(input), expected);
 }
+
+// ---- Round 2: 10 more edge cases ----
+
+#[test]
+fn case11_inline_code_emphasis_preserved() {
+    let input = "The `**markers**` stay verbatim.";
+    let expected = "The `**markers**` stay verbatim.";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case12_underscore_identifiers_preserved() {
+    let input = "Call the __init__ constructor and read my_var here.";
+    let expected = "Call the __init__ constructor and read my_var here.";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case13_wrapped_numbered_list() {
+    let input = "1. First item that\nwraps here\n2. Second item";
+    let expected = "1. First item that wraps here\n2. Second item";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case14_multiple_blank_lines_collapse() {
+    let input = "Para A\n\n\n\nPara B";
+    let expected = "Para A\n\nPara B";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case15_leading_trailing_blank_and_space_trim() {
+    let input = "\n\n  Hello world  \n";
+    let expected = "Hello world";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case16_setext_heading_underline_dropped() {
+    let input = "Project Title\n=============\n\nBody text follows.";
+    let expected = "Project Title\n\nBody text follows.";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case17_crlf_line_endings() {
+    let input = "line that\r\nwrapped across\r\n\r\nnext paragraph";
+    let expected = "line that wrapped across\n\nnext paragraph";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case18_asterisk_bullets_kept() {
+    let input = "* one\n* two";
+    let expected = "* one\n* two";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case19_code_fence_with_markdown_inside() {
+    let input = "```sh\n# not a heading\n- not a list\n**not bold** and 2 * 3\n```";
+    let expected = "```sh\n# not a heading\n- not a list\n**not bold** and 2 * 3\n```";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case20_empty_and_whitespace_input() {
+    assert_eq!(clean(""), "");
+    assert_eq!(clean("   \n\n\t\n"), "");
+}
+
+#[test]
+fn case21_nested_blockquote_collapsed() {
+    let input = "> > deeply nested\n> > quote line";
+    let expected = "> deeply nested quote line";
+    assert_eq!(clean(input), expected);
+}
