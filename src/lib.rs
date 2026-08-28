@@ -89,6 +89,12 @@ fn render_prose_block(lines: &[&str]) -> Option<String> {
             }
             continue; // drop the rule
         }
+        if is_setext_underline(t) {
+            if let Some(s) = cur.take() {
+                logical.push(s);
+            }
+            continue; // keep the title line above, drop the `===` underline
+        }
         if is_heading(t) {
             if let Some(s) = cur.take() {
                 logical.push(s);
@@ -150,6 +156,10 @@ fn is_hr(t: &str) -> bool {
     matches!(first, '-' | '*' | '_') && compact.chars().all(|c| c == first)
 }
 
+fn is_setext_underline(t: &str) -> bool {
+    t.len() >= 2 && t.chars().all(|c| c == '=')
+}
+
 fn is_heading(t: &str) -> bool {
     let hashes = t.chars().take_while(|&c| c == '#').count();
     (1..=6).contains(&hashes) && t[hashes..].starts_with(' ')
@@ -186,25 +196,34 @@ fn strip_quote(t: &str) -> String {
     s.to_string()
 }
 
-/// Strip only matched emphasis pairs with non-space inner boundaries, so lone
-/// asterisks (`2 * 3`, `*.py`, `rm *`) and snake_case underscores survive.
+/// Strip matched `*`/`**` emphasis, but keep inline-code (backtick) spans
+/// verbatim. Underscore emphasis is intentionally NOT stripped — it collides
+/// with code identifiers (`__init__`, `my_var`), and Claude uses `*`/`**` anyway.
 fn strip_emphasis(s: &str) -> String {
+    let mut out = String::new();
+    // Even segments are outside inline code; odd segments are inside it.
+    for (i, part) in s.split('`').enumerate() {
+        if i > 0 {
+            out.push('`');
+        }
+        if i % 2 == 0 {
+            out.push_str(&strip_star_emphasis(part));
+        } else {
+            out.push_str(part); // inside inline code: verbatim
+        }
+    }
+    out
+}
+
+/// Strip matched `*`/`**` pairs with non-space inner boundaries, so lone
+/// asterisks (`2 * 3`, `*.py`, `rm *`) survive.
+fn strip_star_emphasis(s: &str) -> String {
     static BOLD_STAR: OnceLock<Regex> = OnceLock::new();
     static ITAL_STAR: OnceLock<Regex> = OnceLock::new();
-    static BOLD_US: OnceLock<Regex> = OnceLock::new();
-    static ITAL_US: OnceLock<Regex> = OnceLock::new();
-
     let bold_star = BOLD_STAR.get_or_init(|| Regex::new(r"\*\*(\S|\S.*?\S)\*\*").unwrap());
     let ital_star = ITAL_STAR.get_or_init(|| Regex::new(r"\*(\S|\S.*?\S)\*").unwrap());
-    let bold_us =
-        BOLD_US.get_or_init(|| Regex::new(r"(^|[^\w])__(\S|\S.*?\S)__([^\w]|$)").unwrap());
-    let ital_us = ITAL_US.get_or_init(|| Regex::new(r"(^|[^\w])_(\S|\S.*?\S)_([^\w]|$)").unwrap());
-
     let s = bold_star.replace_all(s, "$1").into_owned();
-    let s = ital_star.replace_all(&s, "$1").into_owned();
-    let s = bold_us.replace_all(&s, "${1}${2}${3}").into_owned();
-    let s = ital_us.replace_all(&s, "${1}${2}${3}").into_owned();
-    s
+    ital_star.replace_all(&s, "$1").into_owned()
 }
 
 /// Leading framing preamble detector. Narrow allowlist, fails open (keeps the

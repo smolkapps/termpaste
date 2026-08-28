@@ -11,15 +11,15 @@ Derived from `PRD.md`. This is the agreed build contract (per AGENTS.md). v1 is 
 1. **Deterministic.** Pure function, no network, no LLM in v1. Same input → same output.
 2. **Idempotent.** `clean(clean(x)) == clean(x)`.
 3. **Fail-safe / recoverable.** Never delete content on ambiguity. Preamble stripping is allowlist-only and fails open (keeps the line when unsure).
-4. **Code is sacred.** Inside a fenced code block: no reflow, no indent stripping, no marker stripping — byte-for-byte passthrough of the inner lines.
-5. **Markdown-aware emphasis stripping.** Strip only *matched* `**`/`__`/`*`/`_` emphasis pairs with non-space inner boundaries. Never touch lone/arithmetic/glob asterisks (`2 * 3`, `*.py`, `rm *`).
+4. **Code is sacred.** Inside a fenced code block **and inside inline `` `...` `` code spans**: no reflow, no indent stripping, no marker stripping — verbatim passthrough.
+5. **Markdown-aware emphasis stripping.** Strip only *matched* `**`/`*` emphasis pairs with non-space inner boundaries. Never touch lone/arithmetic/glob asterisks (`2 * 3`, `*.py`, `rm *`). **Underscore emphasis (`__x__`/`_x_`) is NOT stripped** — it collides with code identifiers (`__init__`, `my_var`), and Claude output uses asterisks anyway (fail-safe: preserve).
 6. **Order:** reflow BEFORE emphasis stripping (so emphasis split across a wrap is rejoined first).
 
 ## Transform rules
 
 - **Reflow:** blocks are separated by blank lines. Within a prose block, single-newline-separated lines are wrap artifacts → join with a single space (trim each line's surrounding whitespace). Blank line → paragraph break (preserved, one blank line).
 - **Structural lines never join across their boundary:** headings, horizontal rules, list items (`-`/`*`/`+`/`N.`), blockquote (`>`), code fences. A non-structural line following a list item / blockquote line is a wrapped continuation → joins into that item/quote.
-- **De-chrome:** headings → strip `#`+space, keep text as a plain line. HR (`---`/`***`/`___`, 3+) → drop the line. Bold/italic → strip markers, keep inner text. Keep: blockquote `>`, list markers, backticks/inline code verbatim, emoji, links (keep text / bare URL).
+- **De-chrome:** headings → strip `#`+space, keep text as a plain line. Setext underline (`===`, 2+) → drop the underline, keep the title line above. HR (`---`/`***`/`___`, 3+) → drop the line. Bold/italic → strip markers, keep inner text. Keep: blockquote `>`, list markers, backticks/inline code verbatim, emoji, links (keep text / bare URL).
 - **Preamble (allowlist, fail-open):** drop a leading line matching a small set of obvious framing openers (`Here's ...:`, `Sure, here's ...`, `Here is ...:`) only when it is the first line and clearly framing. Otherwise keep.
 
 ## Failure modes (guarded)
