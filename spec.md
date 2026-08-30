@@ -24,7 +24,11 @@ The default executable reads stdin and writes stdout. On macOS, an explicit `--w
 - **Structural lines never join across their boundary:** headings, horizontal rules, list items (`-`/`*`/`+`/`N.`), blockquote (`>`), code fences. A non-structural line following a list item / blockquote line is a wrapped continuation → joins into that item/quote.
 - **De-chrome:** headings → strip `#`+space, keep text as a plain line. Setext underline (`===`, 2+) → drop the underline, keep the title line above. HR (`---`/`***`/`___`, 3+) → drop the line. Bold/italic → strip markers, keep inner text. Keep: blockquote `>`, list markers, backticks/inline code verbatim, emoji, links (keep text / bare URL).
 - **Preamble (allowlist, fail-open):** drop a leading line matching a small set of obvious framing openers (`Here's ...:`, `Sure, here's ...`, `Here is ...:`) only when it is the first line and clearly framing. Otherwise keep.
-- **Terminal gutter:** outside fenced code, strip one leading known presentation glyph plus following whitespace (`⏺`, `⎿`, `❯`, `•`, or `│`). This targets terminal UI chrome; ordinary Markdown list markers remain unchanged.
+- **Terminal gutter:** outside fenced code, strip one leading known presentation glyph plus following whitespace (`⏺`, `⎿`, `❯`, `•`, or `│`), or a glyph alone on its line. This targets terminal UI chrome; ordinary Markdown list markers remain unchanged. A glyph glued to text (`•nospace`) is left alone (fail-open).
+- **ANSI escapes:** outside fenced code, strip ANSI CSI sequences (e.g. SGR color codes) that survive copies from raw terminal buffers. Removed before gutter detection so a glyph hidden behind a color code is still found.
+- **BOM / zero-width:** remove `U+FEFF` and `U+200B` globally so they don't cling to the first word.
+- **Box-drawing rule:** a line of box-drawing horizontals (`─ ━ ═ ╌ ╍ ┄ ┅`, 3+) is dropped like an HR (Claude Code separators).
+- **Tables:** rows starting with `|` are kept one-per-line (never joined into gibberish); a delimiter row (`| --- | :--: |`) is dropped. Not rendered to prose (out of scope).
 
 ## Failure modes (guarded)
 

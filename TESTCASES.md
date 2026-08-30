@@ -52,3 +52,20 @@ These twelve cases cover the select/copy → paste path for Claude Code and Code
 | 31 | `inline_gutter_is_not_removed` | preserves inline code/text symbols |
 | 32 | `gutter_cleaning_is_idempotent` | running on an already-clean result is safe |
 | 33 | `gutter_and_markdown_clean_together` | applies terminal and Markdown cleanup together |
+
+## Round 4 — 12 more agent-terminal domain cases (5 revealed gaps, now fixed)
+
+| # | Name | Guard | Was |
+|---|------|-------|-----|
+| 34 | `ansi_sgr_codes_stripped` | remove ANSI color escapes from raw-buffer copies | **GAP→fixed** |
+| 35 | `box_drawing_rule_dropped` | drop `────` separators (not just ASCII `---`) | **GAP→fixed** |
+| 36 | `markdown_table_delimiter_dropped_rows_kept` | keep table rows one-per-line, drop `\|---\|` | **GAP→fixed** |
+| 37 | `bold_label_list_item` | `- **Label:** text` → `- Label: text` | lock |
+| 38 | `nbsp_indent_reflowed` | NBSP (U+00A0) wrap indent reflows | lock |
+| 39 | `tab_indented_wrap_reflowed` | tab wrap indent reflows | lock |
+| 40 | `lone_gutter_glyph_line_dropped` | a glyph alone on a line is pure chrome | **GAP→fixed** |
+| 41 | `gutter_then_blockquote` | `⏺ > quote` → `> quote` | lock |
+| 42 | `bom_and_zero_width_stripped` | strip U+FEFF / U+200B | **GAP→fixed** |
+| 43 | `url_with_underscore_and_asterisk_preserved` | `a_b?x=1*2` in a URL survives | lock |
+| 44 | `paren_numbered_list_wrapped` | `1)`/`2)` list wraps join per item | lock |
+| 45 | `checkbox_task_list_kept` | `- [ ]` / `- [x]` preserved | lock |

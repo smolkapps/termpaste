@@ -18,7 +18,7 @@ Leave that command running. Now select a Claude Code or Codex response in iTerm;
 ```bash
 paste-cleaner --clipboard                 # clean the current macOS clipboard once
 pbpaste | paste-cleaner | pbcopy          # equivalent shell pipeline
-cargo test                                # 33 deterministic regression tests
+cargo test                                # 45 deterministic regression tests
 ```
 
 ## Design

@@ -11,7 +11,10 @@ use std::sync::OnceLock;
 
 /// Clean terminal-pasted Claude output into message-ready prose.
 pub fn clean(input: &str) -> String {
-    let lines: Vec<&str> = input.split('\n').collect();
+    // Strip BOM / zero-width chars that survive some terminal copies and would
+    // otherwise cling to the first word.
+    let normalized = input.replace(['\u{feff}', '\u{200b}'], "");
+    let lines: Vec<&str> = normalized.split('\n').collect();
     let mut blocks: Vec<String> = Vec::new();
     let mut i = 0;
 
@@ -82,11 +85,20 @@ fn render_prose_block(lines: &[&str]) -> Option<String> {
 
     for &raw in lines {
         // Claude Code and Codex draw response/output rows with presentation
-        // glyphs. They are terminal chrome, not text the recipient needs.
-        // This happens only after fenced blocks have been excluded above.
-        let t = strip_terminal_gutter(raw).trim();
+        // glyphs, sometimes wrapped in ANSI color escapes. Both are terminal
+        // chrome, not text the recipient needs. ANSI is removed first so a glyph
+        // hidden behind a color code is still recognized. This happens only
+        // after fenced blocks have been excluded above.
+        let deansi = strip_ansi(raw);
+        let degutter = strip_terminal_gutter(&deansi);
+        let t = degutter.trim();
 
-        if is_hr(t) {
+        // A line that became empty (e.g. a lone response glyph) is pure chrome.
+        if t.is_empty() {
+            continue;
+        }
+
+        if is_hr(t) || is_box_rule(t) {
             if let Some(s) = cur.take() {
                 logical.push(s);
             }
@@ -97,6 +109,15 @@ fn render_prose_block(lines: &[&str]) -> Option<String> {
                 logical.push(s);
             }
             continue; // keep the title line above, drop the `===` underline
+        }
+        if is_table_row(t) {
+            if let Some(s) = cur.take() {
+                logical.push(s);
+            }
+            if !is_table_delimiter(t) {
+                logical.push(t.to_string()); // keep data rows, drop the `|---|` separator
+            }
+            continue;
         }
         if is_heading(t) {
             if let Some(s) = cur.take() {
@@ -157,12 +178,41 @@ fn strip_terminal_gutter(raw: &str) -> &str {
     const GUTTERS: [char; 5] = ['⏺', '⎿', '❯', '•', '│'];
     for gutter in GUTTERS {
         if let Some(rest) = trimmed.strip_prefix(gutter) {
-            if rest.chars().next().is_some_and(char::is_whitespace) {
+            // Strip when followed by whitespace, or when the glyph is alone on
+            // the line (a bare response marker). A glyph glued to text like
+            // "•nospace" is left alone (fail-open).
+            if rest.is_empty() || rest.chars().next().is_some_and(char::is_whitespace) {
                 return rest.trim_start();
             }
         }
     }
     trimmed
+}
+
+/// Remove ANSI CSI escape sequences (e.g. SGR color codes) that survive copies
+/// from raw terminal buffers.
+fn strip_ansi(s: &str) -> String {
+    static ANSI: OnceLock<Regex> = OnceLock::new();
+    let ansi = ANSI.get_or_init(|| Regex::new(r"\x1b\[[0-9;?=]*[A-Za-z]").unwrap());
+    ansi.replace_all(s, "").into_owned()
+}
+
+/// Box-drawing horizontal line (Claude Code separators) — dropped like an HR.
+fn is_box_rule(t: &str) -> bool {
+    let compact: String = t.chars().filter(|c| !c.is_whitespace()).collect();
+    compact.chars().count() >= 3
+        && compact
+            .chars()
+            .all(|c| matches!(c, '─' | '━' | '═' | '╌' | '╍' | '┄' | '┅'))
+}
+
+fn is_table_row(t: &str) -> bool {
+    t.starts_with('|')
+}
+
+/// A table delimiter row like `| --- | :--: |` — presentation only, dropped.
+fn is_table_delimiter(t: &str) -> bool {
+    t.starts_with('|') && t.contains('-') && t.chars().all(|c| matches!(c, '|' | '-' | ':' | ' '))
 }
 
 fn is_hr(t: &str) -> bool {
