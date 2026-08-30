@@ -1,6 +1,6 @@
 # TermPaste
 
-**Paste terminal output cleanly.** Select a response in Claude Code or Codex within iTerm, then paste clean prose straight into Gemini, Messages, or email. TermPaste removes terminal response glyphs and Markdown chrome, joins terminal-wrapped lines, and preserves paragraphs, lists, links, emoji, and code.
+**Paste terminal output cleanly.** Select a response in Claude Code or Codex within iTerm, then paste clean prose straight into Gemini, Messages, or email. TermPaste removes terminal response glyphs and Markdown chrome — headings, emphasis, and blockquote `>` markers — joins terminal-wrapped lines, and preserves paragraphs, lists, links, emoji, and code.
 
 ## Make copy → paste work naturally (macOS)
 
@@ -23,7 +23,7 @@ cargo test                                # 45 deterministic regression tests
 
 ## Design
 
-`clean(input) -> String` is a pure, deterministic function (no LLM). It splits input into blank-line-separated blocks, reflows terminal-wrap lines, removes known Claude Code/Codex start-of-line presentation glyphs, then de-chromes Markdown. Reflow runs before emphasis stripping. Fenced code blocks pass through byte-for-byte — no reflow, indent stripping, or marker stripping. The default command reads stdin and writes stdout only; macOS clipboard modes may invoke only `pbpaste` and `pbcopy`.
+`clean(input) -> String` is a pure, deterministic function (no LLM). It splits input into blank-line-separated blocks, reflows terminal-wrap lines, removes known Claude Code/Codex start-of-line presentation glyphs, then de-chromes Markdown (strips heading, emphasis, and blockquote `>` markers; drops horizontal rules). Reflow runs before emphasis stripping. Fenced code blocks pass through byte-for-byte — no reflow, indent stripping, or marker stripping. The default command reads stdin and writes stdout only; macOS clipboard modes may invoke only `pbpaste` and `pbcopy`.
 
 - **Reads:** stdin only. **Writes:** stdout only. **Executes:** nothing.
 - **Kept out of its reach:** the filesystem, network, any LLM call, and the clipboard itself (piping is the caller's choice). Nothing is mutated in place; a bad input can only ever produce a different string, never corrupt a file.

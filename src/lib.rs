@@ -69,19 +69,11 @@ pub fn clean(input: &str) -> String {
     blocks.join("\n\n")
 }
 
-#[derive(PartialEq)]
-enum Kind {
-    Plain,
-    List,
-    Quote,
-}
-
 /// Reflow a prose block into logical lines: soft (single-newline) breaks join;
-/// structural lines (heading/HR/list/quote) bound the join.
+/// structural lines (heading/HR/list) bound the join.
 fn render_prose_block(lines: &[&str]) -> Option<String> {
     let mut logical: Vec<String> = Vec::new();
     let mut cur: Option<String> = None;
-    let mut cur_kind = Kind::Plain;
 
     for &raw in lines {
         // Claude Code and Codex draw response/output rows with presentation
@@ -91,9 +83,16 @@ fn render_prose_block(lines: &[&str]) -> Option<String> {
         // after fenced blocks have been excluded above.
         let deansi = strip_ansi(raw);
         let degutter = strip_terminal_gutter(&deansi);
-        let t = degutter.trim();
+        // A leading run of blockquote markers (`>`, incl. nested `> >`) is
+        // presentation chrome, not content: the target paste surfaces render `>`
+        // literally, and a `>` gutter on a soft-wrapped terminal line is the
+        // common artifact. Strip the markers so the inner text reflows as ordinary
+        // prose. Fenced code is excluded above and an inline-code `>` is never at
+        // line start, so only real leading quote markers are removed here.
+        let dequote = strip_leading_blockquotes(degutter);
+        let t = dequote.trim();
 
-        // A line that became empty (e.g. a lone response glyph) is pure chrome.
+        // A line that became empty (a lone response glyph or bare `>`) is chrome.
         if t.is_empty() {
             continue;
         }
@@ -131,34 +130,16 @@ fn render_prose_block(lines: &[&str]) -> Option<String> {
                 logical.push(s);
             }
             cur = Some(t.to_string());
-            cur_kind = Kind::List;
-            continue;
-        }
-        if is_blockquote(t) {
-            let inner = strip_quote(t);
-            match cur.as_mut() {
-                Some(s) if cur_kind == Kind::Quote => {
-                    s.push(' ');
-                    s.push_str(&inner);
-                }
-                _ => {
-                    if let Some(s) = cur.take() {
-                        logical.push(s);
-                    }
-                    cur = Some(format!("> {}", inner));
-                    cur_kind = Kind::Quote;
-                }
-            }
             continue;
         }
 
-        // Plain line: wrapped continuation of the open logical line, or a new one.
+        // Plain line (now including de-chromed blockquote text): a wrapped
+        // continuation of the open logical line, or the start of a new one.
         if let Some(s) = cur.as_mut() {
             s.push(' ');
             s.push_str(t);
         } else {
             cur = Some(t.to_string());
-            cur_kind = Kind::Plain;
         }
     }
     if let Some(s) = cur.take() {
@@ -252,16 +233,17 @@ fn is_list_item(t: &str) -> bool {
     false
 }
 
-fn is_blockquote(t: &str) -> bool {
-    t.starts_with('>')
-}
-
-fn strip_quote(t: &str) -> String {
-    let mut s = t;
-    while let Some(r) = s.strip_prefix('>') {
-        s = r.trim_start();
+/// Remove a leading run of blockquote markers (`>`, including nested `> >`) plus
+/// the whitespace after each, returning the inner text as a subslice (no
+/// allocation). Only the marker is removed, never the content. Callers apply this
+/// only outside fenced code, and an inline-code `>` is never at line start, so
+/// this touches only real leading quote markers.
+fn strip_leading_blockquotes(s: &str) -> &str {
+    let mut cur = s.trim_start();
+    while let Some(rest) = cur.strip_prefix('>') {
+        cur = rest.trim_start();
     }
-    s.to_string()
+    cur
 }
 
 /// Strip matched `*`/`**` emphasis, but keep inline-code (backtick) spans
