@@ -81,7 +81,10 @@ fn render_prose_block(lines: &[&str]) -> Option<String> {
     let mut cur_kind = Kind::Plain;
 
     for &raw in lines {
-        let t = raw.trim();
+        // Claude Code and Codex draw response/output rows with presentation
+        // glyphs. They are terminal chrome, not text the recipient needs.
+        // This happens only after fenced blocks have been excluded above.
+        let t = strip_terminal_gutter(raw).trim();
 
         if is_hr(t) {
             if let Some(s) = cur.take() {
@@ -145,6 +148,21 @@ fn render_prose_block(lines: &[&str]) -> Option<String> {
     }
     let stripped: Vec<String> = logical.iter().map(|l| strip_emphasis(l)).collect();
     Some(stripped.join("\n"))
+}
+
+/// Remove one recognized terminal UI gutter from a prose line. Requiring
+/// whitespace after the glyph keeps identifiers and ordinary text fail-open.
+fn strip_terminal_gutter(raw: &str) -> &str {
+    let trimmed = raw.trim_start();
+    const GUTTERS: [char; 5] = ['⏺', '⎿', '❯', '•', '│'];
+    for gutter in GUTTERS {
+        if let Some(rest) = trimmed.strip_prefix(gutter) {
+            if rest.chars().next().is_some_and(char::is_whitespace) {
+                return rest.trim_start();
+            }
+        }
+    }
+    trimmed
 }
 
 fn is_hr(t: &str) -> bool {

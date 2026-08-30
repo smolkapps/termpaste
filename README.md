@@ -1,20 +1,31 @@
 # paste-cleaner
 
-Turn text copied out of a Claude terminal response into clean prose you can paste straight into a text message or email — undo the terminal's indent and word-wrap newlines, and strip markdown scaffolding (headings, bold/italic, horizontal rules, framing preamble) while keeping what a person actually types (paragraphs, lists, blockquotes, backticked code, emoji).
+Copy a response from Claude Code or Codex in iTerm, then paste clean prose straight into Gemini, Messages, or email. `paste-cleaner` removes terminal response glyphs and Markdown chrome, joins terminal-wrapped lines, and preserves paragraphs, lists, links, emoji, and code.
 
-## Run
+## Make copy → paste work naturally (macOS)
+
+Install once from this checkout, then start the watcher:
 
 ```bash
-cargo test          # 10 adversarial cases (see TESTCASES.md)
-echo "$CLIPBOARD" | cargo run --quiet          # clean stdin -> stdout
-pbpaste | cargo run --quiet | pbcopy           # clean the macOS clipboard in place
+cargo install --path .
+paste-cleaner --watch-clipboard
+```
+
+Leave that command running. Now select a Claude Code or Codex response in iTerm; when iTerm copies it, `paste-cleaner` cleans the clipboard and your normal Cmd+V pastes the cleaned result. Press Ctrl-C to stop it. The watcher is opt-in and changes only newly copied text when cleaning actually changes it.
+
+## One-off use
+
+```bash
+paste-cleaner --clipboard                 # clean the current macOS clipboard once
+pbpaste | paste-cleaner | pbcopy          # equivalent shell pipeline
+cargo test                                # 33 deterministic regression tests
 ```
 
 ## Design
 
-`clean(input) -> String` is a pure, deterministic function (no LLM in v1). It splits the input into blank-line-separated blocks, reflows each prose block (single-newline breaks are word-wrap artifacts → joined with a space; blank lines are real paragraph breaks → kept), then de-chromes: drop horizontal rules, strip heading `#` markers (keep the text), strip only *matched* emphasis pairs so literal asterisks (`2 * 3`, `*.py`, `rm *`) survive. Reflow runs **before** emphasis stripping so `**` split across a wrap is rejoined first. Fenced code blocks are passed through byte-for-byte — no reflow, no indent or marker stripping. A leading framing preamble ("Here's a longer version:") is removed via a narrow allowlist that **fails open** — on any doubt it keeps the line, so it never eats real content like "Here is code:".
+`clean(input) -> String` is a pure, deterministic function (no LLM). It splits input into blank-line-separated blocks, reflows terminal-wrap lines, removes known Claude Code/Codex start-of-line presentation glyphs, then de-chromes Markdown. Reflow runs before emphasis stripping. Fenced code blocks pass through byte-for-byte — no reflow, indent stripping, or marker stripping. The default command reads stdin and writes stdout only; macOS clipboard modes may invoke only `pbpaste` and `pbcopy`.
 
 - **Reads:** stdin only. **Writes:** stdout only. **Executes:** nothing.
 - **Kept out of its reach:** the filesystem, network, any LLM call, and the clipboard itself (piping is the caller's choice). Nothing is mutated in place; a bad input can only ever produce a different string, never corrupt a file.
 
-See `spec.md` for the full contract and `TESTCASES.md` for the ten failure modes it guards against.
+See `spec.md` for the full contract and `TESTCASES.md` for the regression-case rationale.

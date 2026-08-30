@@ -152,3 +152,187 @@ fn case21_nested_blockquote_collapsed() {
     let expected = "> deeply nested quote line";
     assert_eq!(clean(input), expected);
 }
+
+// ---- Clipboard-terminal regression cases ----
+
+#[test]
+fn case22_claude_response_gutter_removed() {
+    assert_eq!(
+        clean("⏺ Here is the cleaned\n  message."),
+        "Here is the cleaned message."
+    );
+}
+
+#[test]
+fn case23_codex_response_gutter_removed() {
+    assert_eq!(
+        clean("• First wrapped\n• response line"),
+        "First wrapped response line"
+    );
+}
+
+#[test]
+fn case24_claude_continuation_gutter_removed() {
+    assert_eq!(
+        clean("⎿ A terminal continuation\n⎿ becomes normal prose."),
+        "A terminal continuation becomes normal prose."
+    );
+}
+
+#[test]
+fn case25_terminal_prompt_gutter_removed() {
+    assert_eq!(
+        clean("❯ A copied answer\n  is ready to paste."),
+        "A copied answer is ready to paste."
+    );
+}
+
+#[test]
+fn case26_vertical_terminal_gutter_removed() {
+    assert_eq!(
+        clean("│ A rendered response\n│ keeps its words."),
+        "A rendered response keeps its words."
+    );
+}
+
+#[test]
+fn case27_terminal_gutter_with_indent_removed() {
+    assert_eq!(
+        clean("  ⏺ Indented terminal\n    output"),
+        "Indented terminal output"
+    );
+}
+
+#[test]
+fn case28_gutter_requires_following_whitespace() {
+    assert_eq!(clean("•not a terminal gutter"), "•not a terminal gutter");
+}
+
+#[test]
+fn case29_markdown_bullets_are_preserved() {
+    assert_eq!(
+        clean("- One useful point\n- Another point"),
+        "- One useful point\n- Another point"
+    );
+}
+
+#[test]
+fn case30_gutter_inside_fence_is_verbatim() {
+    let input = "```text\n⏺ do not alter this\n• or this\n```";
+    assert_eq!(clean(input), input);
+}
+
+#[test]
+fn case31_inline_gutter_is_not_removed() {
+    assert_eq!(
+        clean("Keep the inline symbol `⏺` exactly."),
+        "Keep the inline symbol `⏺` exactly."
+    );
+}
+
+#[test]
+fn case32_gutter_cleaning_is_idempotent() {
+    let once = clean("⏺ A response\n⏺ ready to paste.");
+    assert_eq!(clean(&once), once);
+}
+
+#[test]
+fn case33_gutter_and_markdown_clean_together() {
+    assert_eq!(
+        clean("⏺ ## Update\n⏺ **Everything** is ready."),
+        "Update\nEverything is ready."
+    );
+}
+
+// ---- Round 4: 12 more agent-terminal domain cases ----
+
+#[test]
+fn case34_ansi_sgr_codes_stripped() {
+    // Copied from a raw buffer/tmux where color escapes survive the copy.
+    let input = "Build \u{1b}[1;32mPASSED\u{1b}[0m in 2.1s";
+    let expected = "Build PASSED in 2.1s";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case35_box_drawing_rule_dropped() {
+    // Claude Code draws separators with box-drawing chars, not ASCII dashes.
+    let input =
+        "First section.\n\n\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\u{2500}\n\nSecond section.";
+    let expected = "First section.\n\nSecond section.";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case36_markdown_table_delimiter_dropped_rows_kept() {
+    // A whole table joined into one line is gibberish; keep rows, drop the `---` delimiter.
+    let input = "| Feature | Status |\n| --- | --- |\n| Reflow | Done |";
+    let expected = "| Feature | Status |\n| Reflow | Done |";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case37_bold_label_list_item() {
+    // Extremely common Claude output shape: "- **Label:** text".
+    let input = "- **Reflow:** joins wrapped lines\n- **De-chrome:** strips markers";
+    let expected = "- Reflow: joins wrapped lines\n- De-chrome: strips markers";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case38_nbsp_indent_reflowed() {
+    // Some terminals paste the wrap indent as non-breaking spaces (U+00A0).
+    let input = "\u{a0}\u{a0}wrapped by the\nterminal gutter";
+    let expected = "wrapped by the terminal gutter";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case39_tab_indented_wrap_reflowed() {
+    let input = "\tindented output that\ncontinues here";
+    let expected = "indented output that continues here";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case40_lone_gutter_glyph_line_dropped() {
+    // A response glyph on its own line (no following text) is pure chrome.
+    let input = "⏺\n⏺ The actual response text here";
+    let expected = "The actual response text here";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case41_gutter_then_blockquote() {
+    let input = "⏺ > Quoted tool output here";
+    let expected = "> Quoted tool output here";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case42_bom_and_zero_width_stripped() {
+    let input = "\u{feff}First real line that\nwrapped";
+    let expected = "First real line that wrapped";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case43_url_with_underscore_and_asterisk_preserved() {
+    let input = "See https://example.com/a_b?x=1*2 for the docs";
+    let expected = "See https://example.com/a_b?x=1*2 for the docs";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case44_paren_numbered_list_wrapped() {
+    let input = "1) Install the deps which\ntakes a while\n2) Run the build";
+    let expected = "1) Install the deps which takes a while\n2) Run the build";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case45_checkbox_task_list_kept() {
+    let input = "- [ ] Write more tests\n- [x] Fix the bug";
+    let expected = "- [ ] Write more tests\n- [x] Fix the bug";
+    assert_eq!(clean(input), expected);
+}

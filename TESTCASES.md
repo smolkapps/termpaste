@@ -33,3 +33,22 @@ Each case below breaks at least one naive baseline. These map 1:1 to `tests/case
 | 19 | `code_fence_with_markdown_inside` | fence containing `# h`, `- i`, `**b**`, `2 * 3` | verbatim | de-chrome must not reach inside fences |
 | 20 | `empty_and_whitespace_input` | `   \n\n\t\n` | `` (empty) | degenerate input → empty, no panic |
 | 21 | `nested_blockquote_collapsed` | `> > a\n> > b` | `> a b` | nested quote levels collapse to one, wrap joins |
+
+## Round 3 — copied terminal UI chrome
+
+These twelve cases cover the select/copy → paste path for Claude Code and Codex terminal output.
+
+| # | Name | Guard |
+|---|------|-------|
+| 22 | `claude_response_gutter_removed` | removes Claude response glyph `⏺` before reflow |
+| 23 | `codex_response_gutter_removed` | removes Codex-style response glyph `•` before reflow |
+| 24 | `claude_continuation_gutter_removed` | removes Claude continuation glyph `⎿` |
+| 25 | `terminal_prompt_gutter_removed` | removes prompt glyph `❯` |
+| 26 | `vertical_terminal_gutter_removed` | removes vertical gutter `│` |
+| 27 | `terminal_gutter_with_indent_removed` | handles terminal indentation before the glyph |
+| 28 | `gutter_requires_following_whitespace` | fails open for ordinary text beginning with a glyph |
+| 29 | `markdown_bullets_are_preserved` | keeps ordinary Markdown list structure |
+| 30 | `gutter_inside_fence_is_verbatim` | never changes code blocks |
+| 31 | `inline_gutter_is_not_removed` | preserves inline code/text symbols |
+| 32 | `gutter_cleaning_is_idempotent` | running on an already-clean result is safe |
+| 33 | `gutter_and_markdown_clean_together` | applies terminal and Markdown cleanup together |
