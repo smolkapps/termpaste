@@ -6,7 +6,7 @@ Derived from `PRD.md`. This is the agreed build contract (per AGENTS.md). v1 is 
 
 `clean(input: &str) -> String`: turn text copied from an AI coding-agent terminal response into clean prose a technical user can paste into a text message, email, or browser chat. Three transforms: **reflow** (undo terminal indent + wrap newlines), **de-chrome** (strip headings, bold, italic, horizontal rules; optionally assistant preamble), and **terminal-gutter removal** (strip known Claude Code/Codex presentation glyphs at the start of prose lines).
 
-The default executable reads stdin and writes stdout. On macOS, an explicit `--watch-clipboard` mode may watch `pbpaste` and replace a newly copied value with `clean(value)`, allowing select/copy → Cmd+V to work without a pipe. It is opt-in, runs until interrupted, and only invokes `pbpaste`/`pbcopy`.
+The `termpaste` executable reads stdin and writes stdout by default. On macOS, an explicit `--watch-clipboard` mode may watch `pbpaste` and replace a newly copied value with `clean(value)`, allowing select/copy → Cmd+V to work without a pipe. It is opt-in, runs until interrupted, and only invokes `pbpaste`/`pbcopy`.
 
 ## Hard constraints
 

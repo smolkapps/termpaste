@@ -26,13 +26,13 @@ fn filter_stdin() {
     if std::io::stdin().read_to_string(&mut input).is_err() {
         std::process::exit(1);
     }
-    let out = paste_cleaner::clean(&input);
+    let out = termpaste::clean(&input);
     let _ = std::io::stdout().write_all(out.as_bytes());
 }
 
 fn clean_clipboard_once() {
     let original = read_clipboard().unwrap_or_else(|error| clipboard_error(error));
-    let cleaned = paste_cleaner::clean(&original);
+    let cleaned = termpaste::clean(&original);
     if cleaned != original {
         write_clipboard(&cleaned).unwrap_or_else(|error| clipboard_error(error));
     }
@@ -48,7 +48,7 @@ fn watch_clipboard() {
         if original == last_seen {
             continue;
         }
-        let cleaned = paste_cleaner::clean(&original);
+        let cleaned = termpaste::clean(&original);
         if cleaned != original {
             write_clipboard(&cleaned).unwrap_or_else(|error| clipboard_error(error));
             eprintln!("Cleaned copied terminal text.");
@@ -94,10 +94,10 @@ fn write_clipboard(value: &str) -> Result<(), String> {
 }
 
 fn clipboard_error(error: String) -> ! {
-    eprintln!("paste-cleaner: {error}");
+    eprintln!("termpaste: {error}");
     std::process::exit(1);
 }
 
 fn print_usage() {
-    println!("Usage: paste-cleaner [--clipboard | --watch-clipboard]\n\nWithout an option, reads stdin and writes cleaned text to stdout.\n--clipboard        Clean the current macOS clipboard once.\n--watch-clipboard  Keep the clipboard clean after each new copy; Ctrl-C stops it.");
+    println!("Usage: termpaste [--clipboard | --watch-clipboard]\n\nWithout an option, reads stdin and writes cleaned text to stdout.\n--clipboard        Clean the current macOS clipboard once.\n--watch-clipboard  Keep the clipboard clean after each new copy; Ctrl-C stops it.");
 }

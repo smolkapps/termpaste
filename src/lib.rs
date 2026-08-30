@@ -1,4 +1,4 @@
-//! Terminal-paste markdown cleaner. See spec.md.
+//! TermPaste: clean terminal output before pasting. See spec.md.
 //! v1: deterministic-only. Public surface is `clean`.
 //!
 //! Pipeline: split into blocks (blank-line separated; fenced code passed through

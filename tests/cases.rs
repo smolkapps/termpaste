@@ -1,5 +1,5 @@
 //! The 10 adversarial cases from TESTCASES.md. See spec.md for rules.
-use paste_cleaner::clean;
+use termpaste::clean;
 
 #[test]
 fn case01_soft_wrap_join() {

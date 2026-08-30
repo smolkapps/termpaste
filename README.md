@@ -1,6 +1,6 @@
-# paste-cleaner
+# TermPaste
 
-Copy a response from Claude Code or Codex in iTerm, then paste clean prose straight into Gemini, Messages, or email. `paste-cleaner` removes terminal response glyphs and Markdown chrome, joins terminal-wrapped lines, and preserves paragraphs, lists, links, emoji, and code.
+**Paste terminal output cleanly.** Select a response in Claude Code or Codex within iTerm, then paste clean prose straight into Gemini, Messages, or email. TermPaste removes terminal response glyphs and Markdown chrome, joins terminal-wrapped lines, and preserves paragraphs, lists, links, emoji, and code.
 
 ## Make copy → paste work naturally (macOS)
 
@@ -8,16 +8,16 @@ Install once from this checkout, then start the watcher:
 
 ```bash
 cargo install --path .
-paste-cleaner --watch-clipboard
+termpaste --watch-clipboard
 ```
 
-Leave that command running. Now select a Claude Code or Codex response in iTerm; when iTerm copies it, `paste-cleaner` cleans the clipboard and your normal Cmd+V pastes the cleaned result. Press Ctrl-C to stop it. The watcher is opt-in and changes only newly copied text when cleaning actually changes it.
+Leave that command running. Now select a Claude Code or Codex response in iTerm; when iTerm copies it, TermPaste cleans the clipboard and your normal Cmd+V pastes the cleaned result. Press Ctrl-C to stop it. The watcher is opt-in and changes only newly copied text when cleaning actually changes it.
 
 ## One-off use
 
 ```bash
-paste-cleaner --clipboard                 # clean the current macOS clipboard once
-pbpaste | paste-cleaner | pbcopy          # equivalent shell pipeline
+termpaste --clipboard                     # clean the current macOS clipboard once
+pbpaste | termpaste | pbcopy              # equivalent shell pipeline
 cargo test                                # 45 deterministic regression tests
 ```
 
