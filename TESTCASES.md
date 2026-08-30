@@ -13,7 +13,7 @@ Each case below breaks at least one naive baseline. These map 1:1 to `tests/case
 | 4 | `bold_stripped_literal_asterisks_kept` | `**bold** and 2 * 3 and *.py` | `bold and 2 * 3 and *.py` | naive "remove all `*`" corrupts arithmetic and globs |
 | 5 | `horizontal_rule_removed` | `Para one\n\n---\n\nPara two` | two paras, no `---` | naive keeps `---`; in a text message it's literal dashes = noise |
 | 6 | `heading_markers_stripped_text_kept` | `## Overview\n\nBody` | `Overview\n\nBody` | naive either keeps `##` or deletes the whole heading line (losing the text) |
-| 7 | `blockquote_wrapped_rejoined` | `> a long quote that\n> wrapped` | `> a long quote that wrapped` | naive join merges into one line and drops/duplicates `>`; naive keep leaves the wrap |
+| 7 | `blockquote_markers_stripped_and_reflowed` | `> a long quote that\n> wrapped` | `a long quote that wrapped` | contract v2: `>` is chrome (paste targets render it literally) → strip the markers and reflow into prose |
 | 8 | `emphasis_spanning_wrap` | `This is **very\n  important** text` | `This is very important text` | strip-before-reflow leaves unmatched `**`; ordering matters |
 | 9 | `idempotent_on_clean_prose` | already-clean prose | identical output | naive "always strip 2 chars" eats real leading characters on a second pass |
 | 10 | `preamble_and_emoji` | `Here's a longer version:\n\n---\n\nHey Mom ... 💙` | preamble + `---` gone, message + emoji kept verbatim | naive keeps AI framing and `---`; or an over-eager stripper eats the emoji / real text |
@@ -32,7 +32,7 @@ Each case below breaks at least one naive baseline. These map 1:1 to `tests/case
 | 18 | `asterisk_bullets_kept` | `* one\n* two` | `* one\n* two` | `*` bullets must not be mistaken for italic markers |
 | 19 | `code_fence_with_markdown_inside` | fence containing `# h`, `- i`, `**b**`, `2 * 3` | verbatim | de-chrome must not reach inside fences |
 | 20 | `empty_and_whitespace_input` | `   \n\n\t\n` | `` (empty) | degenerate input → empty, no panic |
-| 21 | `nested_blockquote_collapsed` | `> > a\n> > b` | `> a b` | nested quote levels collapse to one, wrap joins |
+| 21 | `nested_blockquote_markers_stripped` | `> > a\n> > b` | `a b` | contract v2: a leading run of `>` (incl. nested `> >`) is all chrome → stripped, wrap joins |
 
 ## Round 3 — copied terminal UI chrome
 
@@ -64,8 +64,21 @@ These twelve cases cover the select/copy → paste path for Claude Code and Code
 | 38 | `nbsp_indent_reflowed` | NBSP (U+00A0) wrap indent reflows | lock |
 | 39 | `tab_indented_wrap_reflowed` | tab wrap indent reflows | lock |
 | 40 | `lone_gutter_glyph_line_dropped` | a glyph alone on a line is pure chrome | **GAP→fixed** |
-| 41 | `gutter_then_blockquote` | `⏺ > quote` → `> quote` | lock |
+| 41 | `gutter_then_blockquote_both_stripped` | `⏺ > quote` → `quote` | v2 |
 | 42 | `bom_and_zero_width_stripped` | strip U+FEFF / U+200B | **GAP→fixed** |
 | 43 | `url_with_underscore_and_asterisk_preserved` | `a_b?x=1*2` in a URL survives | lock |
 | 44 | `paren_numbered_list_wrapped` | `1)`/`2)` list wraps join per item | lock |
 | 45 | `checkbox_task_list_kept` | `- [ ]` / `- [x]` preserved | lock |
+
+## Round 5 — blockquote de-chrome (contract v2)
+
+v2 reclassifies a leading `>` from a kept blockquote to presentation chrome: strip the markers (incl. nested `> >`) and reflow the inner text as prose. The paste targets (SMS/email/Docs/browser chat) render `>` literally, and a `>` gutter on a soft-wrapped terminal line is the common artifact. Only the marker is removed; content is preserved. This changed cases 7, 21, and 41 above from their v1 keep-`>` expectations.
+
+| # | Name | Input (abridged) | Expected | Why it's an edge |
+|---|------|------------------|----------|------------------|
+| 46 | `codex_wrapped_blockquote_prefix_reflowed` | `…locally,\n  > before Cmd+V.”` | one line, `>` gone | the real reported case: a soft-wrapped continuation carrying a `>` gutter must reflow into the sentence, not survive as a quote |
+| 47 | `standalone_blockquote_marker_stripped` | `> A deliberate quote line` | `A deliberate quote line` | `>` is chrome even when it begins its own block — no positional exception |
+| 48 | `blockquote_after_prose_joins` | `They said:\n> ship it Friday` | `They said: ship it Friday` | a `>` line glued under a lead-in prose line is a wrap artifact → joins |
+| 49 | `blockquote_stripped_but_inline_code_gt_preserved` | `` > use `a > b` in the guard `` | `` use `a > b` in the guard `` | only the LEADING marker is chrome; a `>` inside inline code is sacred |
+| 50 | `blockquote_inside_fence_is_verbatim` | fence containing `> stays a quote` | verbatim | inside a fence `>` is code, not chrome (guard passes v1 and v2) |
+| 51 | `blockquote_strip_is_idempotent` | `> one\n> two` | `one two`, stable on re-run | stripping must be idempotent |

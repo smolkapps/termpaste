@@ -18,7 +18,7 @@ Leave that command running. Now select a Claude Code or Codex response in iTerm;
 ```bash
 termpaste --clipboard                     # clean the current macOS clipboard once
 pbpaste | termpaste | pbcopy              # equivalent shell pipeline
-cargo test                                # 45 deterministic regression tests
+cargo test                                # 51 deterministic regression tests
 ```
 
 ## Design
