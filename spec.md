@@ -4,7 +4,7 @@ Derived from `PRD.md`. This is the agreed build contract (per AGENTS.md). v1 is 
 
 ## Objective
 
-`clean(input: &str) -> String`: turn text copied from an AI coding-agent terminal response into clean prose a technical user can paste into a text message, email, or browser chat. Three transforms: **reflow** (undo terminal indent + wrap newlines), **de-chrome** (strip headings, bold, italic, horizontal rules; optionally assistant preamble), and **terminal-gutter removal** (strip known Claude Code/Codex presentation glyphs at the start of prose lines).
+`clean(input: &str) -> String`: turn text copied from an AI coding-agent terminal response into clean prose a technical user can paste into a text message, email, or browser chat. Three transforms: **reflow** (undo terminal indent + wrap newlines), **de-chrome** (strip headings, bold, italic, horizontal rules, blockquote markers; optionally assistant preamble), and **terminal-gutter removal** (strip known Claude Code/Codex presentation glyphs at the start of prose lines).
 
 The `termpaste` executable reads stdin and writes stdout by default. On macOS, an explicit `--watch-clipboard` mode may watch `pbpaste` and replace a newly copied value with `clean(value)`, allowing select/copy → Cmd+V to work without a pipe. It is opt-in, runs until interrupted, and only invokes `pbpaste`/`pbcopy`.
 
@@ -21,8 +21,8 @@ The `termpaste` executable reads stdin and writes stdout by default. On macOS, a
 ## Transform rules
 
 - **Reflow:** blocks are separated by blank lines. Within a prose block, single-newline-separated lines are wrap artifacts → join with a single space (trim each line's surrounding whitespace). Blank line → paragraph break (preserved, one blank line).
-- **Structural lines never join across their boundary:** headings, horizontal rules, list items (`-`/`*`/`+`/`N.`), blockquote (`>`), code fences. A non-structural line following a list item / blockquote line is a wrapped continuation → joins into that item/quote.
-- **De-chrome:** headings → strip `#`+space, keep text as a plain line. Setext underline (`===`, 2+) → drop the underline, keep the title line above. HR (`---`/`***`/`___`, 3+) → drop the line. Bold/italic → strip markers, keep inner text. Keep: blockquote `>`, list markers, backticks/inline code verbatim, emoji, links (keep text / bare URL).
+- **Structural lines never join across their boundary:** headings, horizontal rules, list items (`-`/`*`/`+`/`N.`), code fences. A non-structural line following a list item is a wrapped continuation → joins into that item.
+- **De-chrome:** headings → strip `#`+space, keep text as a plain line. Setext underline (`===`, 2+) → drop the underline, keep the title line above. HR (`---`/`***`/`___`, 3+) → drop the line. Bold/italic → strip markers, keep inner text. **Blockquote → strip a leading run of `>` (including nested `> >`) plus the whitespace after each, then reflow the inner text as prose.** A `>` is presentation chrome, not content: the target paste surfaces (SMS, email, Docs, Gemini/ChatGPT web) render a leading `>` as a literal character, never as a quote, and a `>` gutter on a soft-wrapped terminal line is the common real artifact. Only the marker is removed; the inner text is always preserved. Keep: list markers, backticks/inline code verbatim, emoji, links (keep text / bare URL).
 - **Preamble (allowlist, fail-open):** drop a leading line matching a small set of obvious framing openers (`Here's ...:`, `Sure, here's ...`, `Here is ...:`) only when it is the first line and clearly framing. Otherwise keep.
 - **Terminal gutter:** outside fenced code, strip one leading known presentation glyph plus following whitespace (`⏺`, `⎿`, `❯`, `•`, or `│`), or a glyph alone on its line. This targets terminal UI chrome; ordinary Markdown list markers remain unchanged. A glyph glued to text (`•nospace`) is left alone (fail-open).
 - **ANSI escapes:** outside fenced code, strip ANSI CSI sequences (e.g. SGR color codes) that survive copies from raw terminal buffers. Removed before gutter detection so a glyph hidden behind a color code is still found.
@@ -37,6 +37,7 @@ The `termpaste` executable reads stdin and writes stdout by default. On macOS, a
 - Corrupting literal asterisks → guarded by non-space matched-pair emphasis regex.
 - Emphasis markers orphaned by a wrap → guarded by reflow-before-strip ordering.
 - Deleting real content as "preamble" → guarded by allowlist + fail-open.
+- Flattening a deliberate blockquote → accepted by design, bounded to marker-only removal: the `>` is dropped but the inner text is always preserved (never deleted), so content survives; only the (unrendered-on-target) quote styling is lost. Slack-style `>` quoting is sacrificed so the common terminal-wrap `>` artifact cleans correctly.
 - Non-idempotent output → guarded by idempotency test.
 - Watching an unchanged clipboard forever / repeatedly rewriting it → guarded by tracking the last observed clipboard value and writing only a changed cleaned result.
 - Mutating sensitive copied content unexpectedly → guarded by opt-in watcher mode; default stdin mode has no clipboard authority.

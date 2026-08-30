@@ -47,9 +47,11 @@ fn case06_heading_markers_stripped_text_kept() {
 }
 
 #[test]
-fn case07_blockquote_wrapped_rejoined() {
+fn case07_blockquote_markers_stripped_and_reflowed() {
+    // Contract v2: '>' is presentation chrome (paste targets render it literally).
+    // Strip the markers and reflow the wrapped quote into one prose line.
     let input = "> This is a long quote that\n> wrapped across two lines";
-    let expected = "> This is a long quote that wrapped across two lines";
+    let expected = "This is a long quote that wrapped across two lines";
     assert_eq!(clean(input), expected);
 }
 
@@ -147,9 +149,10 @@ fn case20_empty_and_whitespace_input() {
 }
 
 #[test]
-fn case21_nested_blockquote_collapsed() {
+fn case21_nested_blockquote_markers_stripped() {
+    // A leading run of '>' (including nested '> >') is all chrome → stripped.
     let input = "> > deeply nested\n> > quote line";
-    let expected = "> deeply nested quote line";
+    let expected = "deeply nested quote line";
     assert_eq!(clean(input), expected);
 }
 
@@ -303,9 +306,10 @@ fn case40_lone_gutter_glyph_line_dropped() {
 }
 
 #[test]
-fn case41_gutter_then_blockquote() {
+fn case41_gutter_then_blockquote_both_stripped() {
+    // Terminal gutter AND blockquote marker are both chrome → both removed.
     let input = "⏺ > Quoted tool output here";
-    let expected = "> Quoted tool output here";
+    let expected = "Quoted tool output here";
     assert_eq!(clean(input), expected);
 }
 
@@ -335,4 +339,57 @@ fn case45_checkbox_task_list_kept() {
     let input = "- [ ] Write more tests\n- [x] Fix the bug";
     let expected = "- [ ] Write more tests\n- [x] Fix the bug";
     assert_eq!(clean(input), expected);
+}
+
+// ---- Round 5: blockquote de-chrome (contract v2) ----
+
+#[test]
+fn case46_codex_wrapped_blockquote_prefix_reflowed() {
+    // The real reported case: Codex told the user to copy this line; the terminal
+    // soft-wrapped it and the continuation carried an indented '>' gutter. It must
+    // reflow back into the sentence, not survive as a separate quoted line.
+    let input = "\u{201c}Claude Code output looks broken when pasted into Gemini, Slack, or Docs. TermPaste fixes it automatically, locally,\n  > before Cmd+V.\u{201d}";
+    let expected = "\u{201c}Claude Code output looks broken when pasted into Gemini, Slack, or Docs. TermPaste fixes it automatically, locally, before Cmd+V.\u{201d}";
+    assert_eq!(clean(input), expected);
+}
+
+#[test]
+fn case47_standalone_blockquote_marker_stripped() {
+    // '>' is chrome even when it begins its own block (no positional exception).
+    assert_eq!(
+        clean("> A deliberate quote line"),
+        "A deliberate quote line"
+    );
+}
+
+#[test]
+fn case48_blockquote_after_prose_joins() {
+    // A '>' line glued under a lead-in prose line is a wrap artifact → joins.
+    assert_eq!(
+        clean("They said:\n> ship it Friday"),
+        "They said: ship it Friday"
+    );
+}
+
+#[test]
+fn case49_blockquote_stripped_but_inline_code_gt_preserved() {
+    // Only the LEADING quote marker is chrome; a '>' inside inline code is sacred.
+    assert_eq!(
+        clean("> use `a > b` in the guard"),
+        "use `a > b` in the guard"
+    );
+}
+
+#[test]
+fn case50_blockquote_inside_fence_is_verbatim() {
+    // Inside a fenced block, '>' is code, not chrome — passthrough untouched.
+    let input = "```text\n> stays a quote in code\n```";
+    assert_eq!(clean(input), input);
+}
+
+#[test]
+fn case51_blockquote_strip_is_idempotent() {
+    let once = clean("> quoted line one\n> quoted line two");
+    assert_eq!(once, "quoted line one quoted line two");
+    assert_eq!(clean(&once), once);
 }
