@@ -17,6 +17,7 @@ The `termpaste` executable reads stdin and writes stdout by default. On macOS, a
 5. **Markdown-aware emphasis stripping.** Strip only *matched* `**`/`*` emphasis pairs with non-space inner boundaries. Never touch lone/arithmetic/glob asterisks (`2 * 3`, `*.py`, `rm *`). **Underscore emphasis (`__x__`/`_x_`) is NOT stripped** — it collides with code identifiers (`__init__`, `my_var`), and Claude output uses asterisks anyway (fail-safe: preserve).
 6. **Order:** reflow BEFORE emphasis stripping (so emphasis split across a wrap is rejoined first).
 7. **Clipboard authority is explicit and bounded.** Default mode never touches the clipboard. `--watch-clipboard` reads only the macOS clipboard and writes it only when the deterministic cleaner changes a newly observed value. It never reads or writes files, the network, shell configuration, or browser state.
+8. **Watcher is resilient and text-only.** The watch loop only ever acts on valid-UTF-8 text. A non-text / non-UTF-8 clipboard (image, binary, a non-UTF-8 encoding) is **skipped** — never a decode error, never clobbered. A transient `pbpaste`/`pbcopy` failure is non-fatal: the watcher logs nothing fatal and continues to the next tick rather than exiting. The per-tick decision is the pure function `clipboard_action(last_seen, raw_bytes)`.
 
 ## Transform rules
 
@@ -41,6 +42,7 @@ The `termpaste` executable reads stdin and writes stdout by default. On macOS, a
 - Non-idempotent output → guarded by idempotency test.
 - Watching an unchanged clipboard forever / repeatedly rewriting it → guarded by tracking the last observed clipboard value and writing only a changed cleaned result.
 - Mutating sensitive copied content unexpectedly → guarded by opt-in watcher mode; default stdin mode has no clipboard authority.
+- Watcher crashing on a non-text / non-UTF-8 clipboard (image, binary, non-UTF-8 text), especially fatal under a KeepAlive launch agent (crash-loop) → guarded by `clipboard_action` skipping any clipboard value that is not valid UTF-8 (never a decode error, never clobbered) and by treating transient `pbpaste`/`pbcopy` errors as non-fatal so the watcher keeps running.
 
 ## Out of scope (v1)
 

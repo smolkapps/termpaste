@@ -7,6 +7,7 @@ use std::{
     thread,
     time::Duration,
 };
+use termpaste::{clipboard_action, ClipboardAction};
 
 fn main() {
     match env::args().skip(1).collect::<Vec<_>>().as_slice() {
@@ -31,41 +32,48 @@ fn filter_stdin() {
 }
 
 fn clean_clipboard_once() {
-    let original = read_clipboard().unwrap_or_else(|error| clipboard_error(error));
-    let cleaned = termpaste::clean(&original);
-    if cleaned != original {
+    let raw = read_clipboard_bytes().unwrap_or_else(|error| clipboard_error(error));
+    // Non-text / already-clean clipboards yield Skip/Adopt → do nothing.
+    if let ClipboardAction::Replace(cleaned) = clipboard_action("", &raw) {
         write_clipboard(&cleaned).unwrap_or_else(|error| clipboard_error(error));
     }
 }
 
 fn watch_clipboard() {
-    let mut last_seen = read_clipboard().unwrap_or_else(|error| clipboard_error(error));
     eprintln!("Watching the macOS clipboard. Press Ctrl-C to stop.");
+    // Seed the baseline from whatever is on the clipboard now (empty if it is
+    // unreadable or non-text — the loop picks up the next real text copy).
+    let mut last_seen = read_clipboard_bytes()
+        .ok()
+        .and_then(|raw| String::from_utf8(raw).ok())
+        .unwrap_or_default();
 
     loop {
         thread::sleep(Duration::from_millis(200));
-        let original = read_clipboard().unwrap_or_else(|error| clipboard_error(error));
-        if original == last_seen {
-            continue;
-        }
-        let cleaned = termpaste::clean(&original);
-        if cleaned != original {
-            write_clipboard(&cleaned).unwrap_or_else(|error| clipboard_error(error));
-            eprintln!("Cleaned copied terminal text.");
-            last_seen = cleaned;
-        } else {
-            last_seen = original;
+        // A transient read failure is non-fatal: skip this tick, keep watching.
+        let raw = match read_clipboard_bytes() {
+            Ok(raw) => raw,
+            Err(_) => continue,
+        };
+        match clipboard_action(&last_seen, &raw) {
+            ClipboardAction::Skip => {}
+            ClipboardAction::Replace(cleaned) => {
+                if write_clipboard(&cleaned).is_ok() {
+                    eprintln!("Cleaned copied terminal text.");
+                    last_seen = cleaned;
+                }
+            }
+            ClipboardAction::Adopt(text) => last_seen = text,
         }
     }
 }
 
-fn read_clipboard() -> Result<String, String> {
+fn read_clipboard_bytes() -> Result<Vec<u8>, String> {
     let output = Command::new("pbpaste")
         .output()
         .map_err(|error| format!("Could not run pbpaste: {error}"))?;
     if output.status.success() {
-        String::from_utf8(output.stdout)
-            .map_err(|error| format!("Clipboard was not UTF-8: {error}"))
+        Ok(output.stdout)
     } else {
         Err("pbpaste failed".to_string())
     }

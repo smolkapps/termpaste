@@ -69,6 +69,40 @@ pub fn clean(input: &str) -> String {
     blocks.join("\n\n")
 }
 
+/// What the clipboard watcher should do for one observed clipboard value.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ClipboardAction {
+    /// Do nothing: the value is unchanged, or it is non-text / non-UTF-8 content
+    /// that must not be touched.
+    Skip,
+    /// Overwrite the clipboard with this cleaned value.
+    Replace(String),
+    /// Already clean; adopt it as the new last-seen baseline without rewriting.
+    Adopt(String),
+}
+
+/// Decide the watcher's action for a freshly observed clipboard, given the last
+/// value it acted on and the raw bytes now on the clipboard. A non-UTF-8 clipboard
+/// (image, binary, a non-UTF-8 encoding) is skipped — never decoded with an error
+/// and never clobbered — so the watch loop cannot crash on it (which, under a
+/// KeepAlive launch agent, would otherwise crash-loop). Keeping this a pure
+/// function makes the watcher's core logic testable without touching pbpaste.
+pub fn clipboard_action(last_seen: &str, raw: &[u8]) -> ClipboardAction {
+    let text = match std::str::from_utf8(raw) {
+        Ok(t) => t,
+        Err(_) => return ClipboardAction::Skip,
+    };
+    if text == last_seen {
+        return ClipboardAction::Skip;
+    }
+    let cleaned = clean(text);
+    if cleaned != text {
+        ClipboardAction::Replace(cleaned)
+    } else {
+        ClipboardAction::Adopt(text.to_string())
+    }
+}
+
 /// Reflow a prose block into logical lines: soft (single-newline) breaks join;
 /// structural lines (heading/HR/list) bound the join.
 fn render_prose_block(lines: &[&str]) -> Option<String> {
