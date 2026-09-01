@@ -3,8 +3,13 @@
 // new copy, asks the bundled `termpaste` binary to clean it. All cleaning logic and
 // the terminal-only pre-gate live in the tested Rust core. See spec-menubar.md.
 //
-// Entry point is @main (explicit) — a file that mixes type declarations with bare
-// top-level statements does not reliably run the top-level code as main under swiftc.
+// Entry point is @main (built with -parse-as-library) — a file that mixes type
+// declarations with bare top-level statements does not run the top-level code as
+// main under swiftc, so the process would launch and do nothing.
+//
+// `--headless` runs the identical watch→clean loop WITHOUT the menu-bar status item
+// (which needs a GUI/WindowServer session). Same automation, no UI — useful for a
+// no-icon setup and for verifying the watch loop in a non-GUI context.
 import AppKit
 import Foundation
 
@@ -22,32 +27,39 @@ func tpLog(_ msg: String) {
 }
 
 final class Controller: NSObject {
-    private var statusItem: NSStatusItem!
+    private let headless: Bool
+    private var statusItem: NSStatusItem?
     private var timer: Timer?
     private var lastChangeCount = NSPasteboard.general.changeCount
     private var enabled = true
     private var cleanEverything = false // false = terminal-only (default, per spec)
 
     private lazy var termpastePath: String = {
-        let bundled = Bundle.main.bundlePath + "/Contents/MacOS/termpaste"
+        let bundled = Bundle.main.bundlePath + "/Contents/Resources/termpaste"
         if FileManager.default.isExecutableFile(atPath: bundled) {
             return bundled
         }
         return FileManager.default.homeDirectoryForCurrentUser.path + "/.cargo/bin/termpaste"
     }()
 
-    override init() {
+    init(headless: Bool) {
+        self.headless = headless
         super.init()
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "✂︎"
-        rebuildMenu()
+        if !headless {
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+            item.button?.title = "✂︎"
+            statusItem = item
+            rebuildMenu()
+        }
+        // Common-mode timer so it keeps firing during menu tracking.
         let t = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
-        tpLog("watching")
+        tpLog(headless ? "watching (headless)" : "watching")
     }
 
     private func rebuildMenu() {
+        guard let statusItem else { return }
         let menu = NSMenu()
         let status = NSMenuItem(
             title: enabled ? "Watching the clipboard" : "Paused", action: nil, keyEquivalent: ""
@@ -121,11 +133,15 @@ final class Controller: NSObject {
 @main
 enum TermPasteMain {
     static func main() {
-        tpLog("main: start")
-        let app = NSApplication.shared
-        app.setActivationPolicy(.accessory) // menu-bar only, no Dock icon (LSUIElement)
-        let controller = Controller()
+        let headless = CommandLine.arguments.contains("--headless")
+        let controller = Controller(headless: headless)
         _ = controller // retain for process lifetime
-        app.run()
+        if headless {
+            RunLoop.main.run() // no NSApplication/status item; identical watch loop
+        } else {
+            let app = NSApplication.shared
+            app.setActivationPolicy(.accessory) // menu-bar only, no Dock icon
+            app.run()
+        }
     }
 }

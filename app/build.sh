@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 
 APP="TermPaste.app"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 cat > "$APP/Contents/Info.plist" <<'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
@@ -31,10 +31,10 @@ swiftc -O -parse-as-library -o "$APP/Contents/MacOS/TermPaste" TermPaste.swift -
 
 # Bundle the termpaste CLI so the app is self-contained.
 if [ -x "$HOME/.cargo/bin/termpaste" ]; then
-  cp "$HOME/.cargo/bin/termpaste" "$APP/Contents/MacOS/termpaste"
+  cp "$HOME/.cargo/bin/termpaste" "$APP/Contents/Resources/termpaste"
   echo "Bundled termpaste from ~/.cargo/bin."
 elif command -v termpaste >/dev/null 2>&1; then
-  cp "$(command -v termpaste)" "$APP/Contents/MacOS/termpaste"
+  cp "$(command -v termpaste)" "$APP/Contents/Resources/termpaste"
   echo "Bundled termpaste from PATH."
 else
   echo "WARNING: termpaste binary not found — run 'cargo install --path ..' first." >&2
