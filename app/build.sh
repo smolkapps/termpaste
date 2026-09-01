@@ -27,7 +27,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 PLIST
 
 echo "Compiling TermPaste.swift ..."
-swiftc -O -o "$APP/Contents/MacOS/TermPaste" TermPaste.swift -framework AppKit
+swiftc -O -parse-as-library -o "$APP/Contents/MacOS/TermPaste" TermPaste.swift -framework AppKit
 
 # Bundle the termpaste CLI so the app is self-contained.
 if [ -x "$HOME/.cargo/bin/termpaste" ]; then

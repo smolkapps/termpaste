@@ -1,15 +1,25 @@
 // TermPaste — macOS menu-bar app. A thin AppKit shell around the deterministic
 // `termpaste` CLI: it watches the clipboard via NSPasteboard.changeCount and, on a
 // new copy, asks the bundled `termpaste` binary to clean it. All cleaning logic and
-// the terminal-only pre-gate live in the tested Rust core — this file only decides
-// *when* to run it and provides the menu-bar UX. See spec-menubar.md.
+// the terminal-only pre-gate live in the tested Rust core. See spec-menubar.md.
 //
-// Setup happens in Controller.init() (before NSApp.run()), not in an
-// NSApplicationDelegate callback — a manually-constructed NSApplication does not
-// reliably deliver applicationDidFinishLaunching, which would leave the run loop
-// with no timer and exit immediately.
+// Entry point is @main (explicit) — a file that mixes type declarations with bare
+// top-level statements does not reliably run the top-level code as main under swiftc.
 import AppKit
 import Foundation
+
+func tpLog(_ msg: String) {
+    let path = FileManager.default.homeDirectoryForCurrentUser.path
+        + "/Library/Logs/termpaste-app.log"
+    guard let data = "termpaste-app: \(msg)\n".data(using: .utf8) else { return }
+    if let fh = FileHandle(forWritingAtPath: path) {
+        fh.seekToEndOfFile()
+        fh.write(data)
+        fh.closeFile()
+    } else {
+        try? data.write(to: URL(fileURLWithPath: path))
+    }
+}
 
 final class Controller: NSObject {
     private var statusItem: NSStatusItem!
@@ -31,24 +41,10 @@ final class Controller: NSObject {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusItem.button?.title = "✂︎"
         rebuildMenu()
-        // Common-mode timer so it keeps firing during menu tracking.
         let t = Timer(timeInterval: 0.3, repeats: true) { [weak self] _ in self?.poll() }
         RunLoop.main.add(t, forMode: .common)
         timer = t
-        log("launched")
-    }
-
-    private func log(_ msg: String) {
-        let path = FileManager.default.homeDirectoryForCurrentUser.path
-            + "/Library/Logs/termpaste-app.log"
-        guard let data = "termpaste-app: \(msg)\n".data(using: .utf8) else { return }
-        if let fh = FileHandle(forWritingAtPath: path) {
-            fh.seekToEndOfFile()
-            fh.write(data)
-            fh.closeFile()
-        } else {
-            try? data.write(to: URL(fileURLWithPath: path))
-        }
+        tpLog("watching")
     }
 
     private func rebuildMenu() {
@@ -90,9 +86,8 @@ final class Controller: NSObject {
         if cc == lastChangeCount {
             return
         }
-        log("clipboard changed → clean (\(cleanEverything ? "all" : "terminal-only"))")
+        tpLog("clipboard changed → clean (\(cleanEverything ? "all" : "terminal-only"))")
         runClean()
-        // Adopt whatever count exists after our own write so we never re-trigger on it.
         lastChangeCount = NSPasteboard.general.changeCount
     }
 
@@ -103,9 +98,7 @@ final class Controller: NSObject {
         do {
             try proc.run()
             proc.waitUntilExit()
-        } catch {
-            // Missing/unrunnable binary: fail quiet, keep watching.
-        }
+        } catch {}
     }
 
     @objc private func toggleEnabled() {
@@ -125,8 +118,14 @@ final class Controller: NSObject {
     }
 }
 
-let app = NSApplication.shared
-app.setActivationPolicy(.accessory) // menu-bar only, no Dock icon (LSUIElement)
-let controller = Controller()
-_ = controller // keep it alive for the process lifetime
-app.run()
+@main
+enum TermPasteMain {
+    static func main() {
+        tpLog("main: start")
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory) // menu-bar only, no Dock icon (LSUIElement)
+        let controller = Controller()
+        _ = controller // retain for process lifetime
+        app.run()
+    }
+}
