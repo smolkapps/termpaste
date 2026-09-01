@@ -103,6 +103,51 @@ pub fn clipboard_action(last_seen: &str, raw: &[u8]) -> ClipboardAction {
     }
 }
 
+/// Deterministic pre-gate for the menu-bar app: does this text look like agent /
+/// terminal output worth cleaning? Fail-safe — returns false when unsure, so an
+/// always-on watcher never rewrites ordinary copied text (a markdown snippet, plain
+/// prose). See spec-menubar.md. The app applies this only in its default
+/// "terminal-only" mode; a "Clean everything" toggle bypasses it.
+pub fn looks_like_terminal_output(text: &str) -> bool {
+    // ANSI escape anywhere is a strong terminal signal.
+    if text.contains('\u{1b}') {
+        return true;
+    }
+    let lines: Vec<&str> = text.split('\n').collect();
+    for (i, raw) in lines.iter().enumerate() {
+        let t = raw.trim_start();
+        // A response/gutter glyph at the start of a line.
+        if let Some(first) = t.chars().next() {
+            if matches!(first, '⏺' | '⎿' | '❯' | '•' | '│') {
+                return true;
+            }
+        }
+        // A box-drawing rule line (Claude Code separators).
+        let compact: String = t.chars().filter(|c| !c.is_whitespace()).collect();
+        if compact.chars().count() >= 3
+            && compact
+                .chars()
+                .all(|c| matches!(c, '─' | '━' | '═' | '╌' | '╍' | '┄' | '┅'))
+        {
+            return true;
+        }
+        // Soft-wrap artifact: this line does not end a sentence and the next line
+        // (single newline) is indented with content — the terminal wrap pattern.
+        if let Some(next) = lines.get(i + 1) {
+            let ends_sentence = raw
+                .trim_end()
+                .chars()
+                .last()
+                .is_none_or(|c| matches!(c, '.' | '!' | '?'));
+            let next_indented = next.starts_with([' ', '\t']) && !next.trim().is_empty();
+            if !ends_sentence && next_indented {
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Reflow a prose block into logical lines: soft (single-newline) breaks join;
 /// structural lines (heading/HR/list) bound the join.
 fn render_prose_block(lines: &[&str]) -> Option<String> {
