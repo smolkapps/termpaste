@@ -22,6 +22,16 @@ terminal output)**, **Clean clipboard now**, and **Quit**. The default is termin
 box rules, the soft-wrap pattern), so it never rewrites deliberately-copied markdown or
 prose. Toggle **Clean everything** to clean every copy.
 
+## Headless mode
+
+Prefer no menu-bar icon? The same watch-and-clean loop runs without a status item:
+
+```bash
+./TermPaste.app/Contents/MacOS/TermPaste --headless &
+```
+
+This is also how the auto-clean is verified without a GUI session.
+
 ## How it decides (no fight, no surprise)
 
 - Polls `NSPasteboard.changeCount`; on a real change it runs `termpaste
@@ -32,9 +42,13 @@ prose. Toggle **Clean everything** to clean every copy.
 
 ## Status / distribution
 
-The core, the pre-gate, and the `--clipboard-terminal` path are covered by the suite
-and verified end to end. The bundle is ad-hoc signed today, so a first launch may need
-**right-click → Open** (Gatekeeper). Developer ID signing + notarization — so it opens
-on a plain double-click for anyone, and can auto-start at login via `SMAppService` — is
-the remaining distribution step. A launch/heartbeat log is written to
+The clean core, the terminal-only pre-gate, and the app's watch→clean loop are covered
+by the suite and verified end to end — including through the app binary itself in
+`--headless` mode (terminal wraps and agent glyphs get cleaned on copy; deliberate
+markdown is left alone). The menu-bar status item needs a normal logged-in session to
+appear; launch it there. A launch/clean log is written to
 `~/Library/Logs/termpaste-app.log`.
+
+The bundle is ad-hoc signed today, so a first launch may need **right-click → Open**
+(Gatekeeper). Developer ID signing + notarization — so it opens on a plain double-click
+for anyone, plus login autostart via `SMAppService` — is the remaining distribution step.
