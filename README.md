@@ -28,4 +28,8 @@ cargo test                                # 55 deterministic tests (51 clean() c
 - **Reads:** stdin only. **Writes:** stdout only. **Executes:** nothing.
 - **Kept out of its reach:** the filesystem, network, any LLM call, and the clipboard itself (piping is the caller's choice). Nothing is mutated in place; a bad input can only ever produce a different string, never corrupt a file.
 
+## How this was built
+
+TermPaste was built with an AI coding agent driven through a spec-first, test-driven loop. The contract lives in `AGENTS.md`: no code without an agreed `spec.md`, deterministic code over model calls, and the model bounded to judgment calls only. Each change lands as a failing test first and then the implementation, so the RED/GREEN commits in the git history are one iteration each, and the 55-test suite in `tests/` is the verification signal the agent can't satisfy without actually meeting the spec.
+
 See `spec.md` for the full contract and `TESTCASES.md` for the regression-case rationale.
