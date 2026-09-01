@@ -7,12 +7,13 @@ use std::{
     thread,
     time::Duration,
 };
-use termpaste::{clipboard_action, ClipboardAction};
+use termpaste::{clipboard_action, looks_like_terminal_output, ClipboardAction};
 
 fn main() {
     match env::args().skip(1).collect::<Vec<_>>().as_slice() {
         [] => filter_stdin(),
-        [flag] if flag == "--clipboard" => clean_clipboard_once(),
+        [flag] if flag == "--clipboard" => clean_clipboard_once(false),
+        [flag] if flag == "--clipboard-terminal" => clean_clipboard_once(true),
         [flag] if flag == "--watch-clipboard" => watch_clipboard(),
         [flag] if flag == "--help" || flag == "-h" => print_usage(),
         _ => {
@@ -31,8 +32,16 @@ fn filter_stdin() {
     let _ = std::io::stdout().write_all(out.as_bytes());
 }
 
-fn clean_clipboard_once() {
+fn clean_clipboard_once(terminal_only: bool) {
     let raw = read_clipboard_bytes().unwrap_or_else(|error| clipboard_error(error));
+    // In terminal-only mode, act only when the clipboard looks like agent/terminal
+    // output — so an always-on caller never rewrites deliberately-copied text.
+    if terminal_only {
+        match std::str::from_utf8(&raw) {
+            Ok(text) if looks_like_terminal_output(text) => {}
+            _ => return,
+        }
+    }
     // Non-text / already-clean clipboards yield Skip/Adopt → do nothing.
     if let ClipboardAction::Replace(cleaned) = clipboard_action("", &raw) {
         write_clipboard(&cleaned).unwrap_or_else(|error| clipboard_error(error));
@@ -107,5 +116,5 @@ fn clipboard_error(error: String) -> ! {
 }
 
 fn print_usage() {
-    println!("Usage: termpaste [--clipboard | --watch-clipboard]\n\nWithout an option, reads stdin and writes cleaned text to stdout.\n--clipboard        Clean the current macOS clipboard once.\n--watch-clipboard  Keep the clipboard clean after each new copy; Ctrl-C stops it.");
+    println!("Usage: termpaste [--clipboard | --clipboard-terminal | --watch-clipboard]\n\nWithout an option, reads stdin and writes cleaned text to stdout.\n--clipboard           Clean the current macOS clipboard once.\n--clipboard-terminal  Clean the clipboard once, only if it looks like terminal output.\n--watch-clipboard     Keep the clipboard clean after each new copy; Ctrl-C stops it.");
 }
