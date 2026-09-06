@@ -13,6 +13,8 @@ termpaste --watch-clipboard
 
 Leave that command running. Now select a Claude Code or Codex response in iTerm; when iTerm copies it, TermPaste cleans the clipboard and your normal Cmd+V pastes the cleaned result. Press Ctrl-C to stop it. The watcher is opt-in and changes only newly copied text when cleaning actually changes it.
 
+The watcher checks native `NSPasteboard.changeCount` every 50 ms and runs `pbpaste` only after a change. Idle polling starts no subprocesses. When configuring a launch agent, use `ProcessType = Interactive`; `Background` scheduling can delay cleaning beyond the polling interval. Cleaning is asynchronous: an immediate Cmd+V can still beat it. See [watcher validation](WATCHER-VALIDATION-2026-09-06.md) for measured latency on the installed launch agent.
+
 ## One-off use
 
 ```bash

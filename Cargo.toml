@@ -14,3 +14,7 @@ path = "src/lib.rs"
 [[bin]]
 name = "termpaste"
 path = "src/main.rs"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6.3", features = ["exception"] }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSPasteboard"] }
