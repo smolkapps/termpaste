@@ -10,7 +10,10 @@ pre-gate live in the tested Rust crate; this app only decides *when* to run it).
 Requires macOS with Xcode command-line tools (`swiftc`), plus the `termpaste` CLI it
 bundles:
 
+Run from the repository root:
+
 ```bash
+cd app
 cargo install --path ..     # build + install the termpaste CLI (bundled into the app)
 ./build.sh                  # produce TermPaste.app (self-contained)
 open TermPaste.app          # or double-click it in Finder

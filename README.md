@@ -2,25 +2,59 @@
 
 **Paste terminal output cleanly.** Select a response in Claude Code or Codex within iTerm, then paste clean prose straight into Gemini, Messages, or email. TermPaste removes terminal response glyphs and Markdown chrome — headings, emphasis, and blockquote `>` markers — joins terminal-wrapped lines, and preserves paragraphs, lists, links, emoji, and code.
 
-## Make copy → paste work naturally (macOS)
+## Download and install (macOS)
 
-Install once from this checkout, then start the watcher:
+TermPaste currently installs **from source**. There is no prebuilt `.dmg`, `.pkg`, or GitHub release download yet.
+
+1. Install Apple's Command Line Tools if needed: `xcode-select --install`.
+2. Install Rust and Cargo using [rustup](https://rustup.rs/), then open a new terminal.
+3. Download the source and install:
 
 ```bash
-cargo install --path .
-termpaste --watch-clipboard
+git clone https://github.com/smolkapps/termpaste.git
+cd termpaste
+cargo install --path . --force
 ```
 
-Leave that command running. Now select a Claude Code or Codex response in iTerm; when iTerm copies it, TermPaste cleans the clipboard and your normal Cmd+V pastes the cleaned result. Press Ctrl-C to stop it. The watcher is opt-in and changes only newly copied text when cleaning actually changes it.
+Alternatively, choose **Code → Download ZIP** on GitHub, extract it, open a terminal in the extracted folder, and run the same `cargo install` command.
 
-The watcher checks native `NSPasteboard.changeCount` every 50 ms and runs `pbpaste` only after a change. Idle polling starts no subprocesses. When configuring a launch agent, use `ProcessType = Interactive`; `Background` scheduling can delay cleaning beyond the polling interval. Cleaning is asynchronous: an immediate Cmd+V can still beat it. See [watcher validation](WATCHER-VALIDATION-2026-09-06.md) for measured latency on the installed launch agent.
+## Start automatic cleaning
+
+```bash
+"$HOME/.cargo/bin/termpaste" --watch-clipboard
+```
+
+Leave that command running. Copy a Claude Code or Codex response from your terminal, then paste normally with Cmd+V. In iTerm, selecting text also copies it if **Copy to pasteboard on selection** is enabled; otherwise use Cmd+C. TermPaste cleans newly copied text when cleaning changes it, including Unicode punctuation, accented text, and emoji. Press Ctrl-C to stop it. Starting this command does not configure login autostart.
+
+The watcher checks native `NSPasteboard.changeCount` every 50 ms and runs `pbpaste` only after a change. Idle polling starts no subprocesses. When configuring a launch agent, use `ProcessType = Interactive`; `Background` scheduling can delay cleaning beyond the polling interval. Cleaning is asynchronous: an immediate Cmd+V can still beat it. See [watcher validation](WATCHER-VALIDATION-2026-09-06.md) for measured latency and Unicode replacement checks.
+
+Prefer a menu-bar app? See the [app build instructions](app/README.md). It uses terminal-only detection by default; the CLI watcher above cleans all copied text that the cleaner changes. Run one watcher at a time.
+
+## Update an existing installation
+
+**The September 6, 2026 fix is essential for background users:** older builds could appear to run normally while silently failing to clean text containing Unicode characters. The fix explicitly uses UTF-8 for clipboard reads and writes.
+
+From your existing source checkout:
+
+```bash
+git pull --ff-only
+cargo install --path . --force
+```
+
+**Restart the running watcher after updating.** For a terminal watcher, press Ctrl-C and run the start command again. If you already configured the `com.smolkai.termpaste-watch` launch agent, restart it with:
+
+```bash
+launchctl kickstart -k "gui/$(id -u)/com.smolkai.termpaste-watch"
+```
+
+For the menu-bar app, quit it, rebuild it using the linked instructions, and reopen it; it bundles its own copy of the CLI.
 
 ## One-off use
 
 ```bash
 termpaste --clipboard                     # clean the current macOS clipboard once
-pbpaste | termpaste | pbcopy              # equivalent shell pipeline
-cargo test                                # 55 deterministic tests (51 clean() cases + 4 watcher)
+LC_ALL=en_US.UTF-8 pbpaste | termpaste | LC_ALL=en_US.UTF-8 pbcopy
+cargo test                                # 69 tests covering cleaning, detection, watcher gating, and locale handling
 ```
 
 ## Design
@@ -32,6 +66,6 @@ cargo test                                # 55 deterministic tests (51 clean() c
 
 ## How this was built
 
-TermPaste was built with an AI coding agent driven through a spec-first, test-driven loop. The contract lives in `AGENTS.md`: no code without an agreed `spec.md`, deterministic code over model calls, and the model bounded to judgment calls only. Each change lands as a failing test first and then the implementation, so the RED/GREEN commits in the git history are one iteration each, and the 55-test suite in `tests/` is the verification signal the agent can't satisfy without actually meeting the spec.
+TermPaste was built with an AI coding agent driven through a spec-first, test-driven loop. The contract lives in `AGENTS.md`: no code without an agreed `spec.md`, deterministic code over model calls, and the model bounded to judgment calls only. Each change lands as a failing test first and then the implementation, so the RED/GREEN commits in the git history are one iteration each, and the 69-test suite is the verification signal the agent can't satisfy without actually meeting the spec.
 
 See `spec.md` for the full contract and `TESTCASES.md` for the regression-case rationale.
