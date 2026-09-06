@@ -66,6 +66,14 @@ cargo test                                # 69 tests covering cleaning, detectio
 
 ## How this was built
 
-TermPaste was built with an AI coding agent driven through a spec-first, test-driven loop. The contract lives in `AGENTS.md`: no code without an agreed `spec.md`, deterministic code over model calls, and the model bounded to judgment calls only. Each change lands as a failing test first and then the implementation, so the RED/GREEN commits in the git history are one iteration each, and the 69-test suite is the verification signal the agent can't satisfy without actually meeting the spec.
+TermPaste was built with an AI coding agent driven through a spec-first, test-driven loop. The contract lives in `AGENTS.md`: no code without an agreed `spec.md`, deterministic code over model calls, and the model bounded to judgment calls only. Each change lands as a failing test first and then the implementation, so the RED/GREEN commits in the git history are one iteration each, and the 69-test suite provides regression coverage. Passing those tests alone does not prove the installed workflow works.
 
 See `spec.md` for the full contract and `TESTCASES.md` for the regression-case rationale.
+
+### Lesson learned: test the installed workflow with real text
+
+The original Unicode tests passed because they called the cleaner directly. Live watcher benchmarks used ASCII text. Neither caught that a macOS launch agent lacks the terminal’s UTF-8 locale: `pbpaste` returned legacy-encoded bytes for ordinary text such as `agent’s` and `I’ll`, and the safety check silently skipped the entire paragraph as invalid UTF-8. The watcher looked healthy while its primary replacement workflow failed. Faster polling improved timing but did not fix that failure.
+
+Curly apostrophes, terminal glyphs, accented letters, and emoji are normal input for this product, not rare edge cases. We had specified Unicode support but missed the encoding boundary between the clipboard subprocesses and the cleaner. Both `pbpaste` and `pbcopy` now explicitly use UTF-8. Regression tests cover absent and conflicting parent locales, and live checks verified exact cleaned text through the installed launch agent, including the previously stuck clipboard.
+
+**The acceptance test is successful replacement of representative text in the actual background environment, not just a passing cleaner test or a faster ASCII benchmark.** See the [failure investigation and verification record](WATCHER-VALIDATION-2026-09-06.md#unicode-replacement-repair-after-user-reported-failure).
