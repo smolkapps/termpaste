@@ -97,6 +97,8 @@ fn watch_clipboard() {
 
 fn read_clipboard_bytes() -> Result<Vec<u8>, String> {
     let output = Command::new("pbpaste")
+        // launchd does not inherit the terminal’s UTF-8 locale.
+        .env("LC_ALL", "en_US.UTF-8")
         .output()
         .map_err(|error| format!("Could not run pbpaste: {error}"))?;
     if output.status.success() {
@@ -108,6 +110,7 @@ fn read_clipboard_bytes() -> Result<Vec<u8>, String> {
 
 fn write_clipboard(value: &str) -> Result<(), String> {
     let mut child = Command::new("pbcopy")
+        .env("LC_ALL", "en_US.UTF-8")
         .stdin(Stdio::piped())
         .spawn()
         .map_err(|error| format!("Could not run pbcopy: {error}"))?;

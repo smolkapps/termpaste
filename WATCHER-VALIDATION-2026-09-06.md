@@ -41,3 +41,26 @@ pbpaste/pbcopy as specified. Scheduling and system load can affect latency; a fa
 copy/paste race remains. Real iTerm selection was not driven.
 Temporary probes are in `/tmp/termpaste-watcher-check/`; they keep clipboard
 contents out of their output. Cargo.lock remains ignored per repository convention.
+
+## Unicode replacement repair after user-reported failure
+
+The latency checks above used ASCII text and did not establish Unicode replacement
+correctness. The running agent silently skipped an actual 259-byte UTF-8 clipboard
+value, including when that same value was recopied. With launchd's locale-free
+environment, pbpaste returned 255 bytes of non-UTF-8 data; explicit
+`LC_ALL=en_US.UTF-8` returned the correct 259 UTF-8 bytes. The unchanged text-only
+safety guard therefore treated valid copied prose as binary. Background scheduling
+was a separate latency issue, not the cause of this replacement failure.
+
+Both pbpaste and pbcopy now explicitly receive `LC_ALL=en_US.UTF-8`, overriding
+absent or conflicting inherited locales. The regression test first failed against
+the previous implementation, then passed with the fix. All 69 tests pass (none
+skipped), Clippy is clean, and the release binary was installed and the launch agent
+restarted.
+
+Live verification through the installed agent confirmed exact cleaned bytes for:
+the previously stuck clipboard, the user's quoted paragraph, curly apostrophes,
+terminal glyphs plus accented text and emoji, Hebrew/Chinese text, and a repeated
+dirty copy. The cleaned version of the original clipboard was restored afterward.
+No real iTerm selection gesture was automated; the reproduced encoding failure and
+actual installed-agent replacement were verified directly on the general pasteboard.
